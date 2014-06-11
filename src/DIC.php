@@ -138,4 +138,43 @@ class DIC
         
     }
     
+    function forceArgs($name, $args = array())
+    {
+        
+        // Add/overwrite args for $name
+        $this->args[$name] = $args;
+        
+        // Allow this method to be chained
+        return $this;
+        
+    }
+    
+    function forceDestructiveGet($name)
+    {
+        
+        // Reset the loaded class
+        unset($this->loaded[$name]);
+        
+        // Perform the load again
+        return $this->get($name);
+        
+    }
+    
+    function forceDestructiveSingleGet($name)
+    {
+        
+        // Store existing class temporarily
+        $tObj = $this->loaded[$name];
+        
+        // For the get
+        $single = $this->forceDestructiveGet($name);
+        
+        // Restore the old class
+        $this->loaded[$name] = $tObj;
+        
+        // Return the generated class
+        return $single;
+        
+    }
+    
 }

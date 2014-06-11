@@ -11,6 +11,41 @@ class DIC
     
     protected $args = array();
     
+    protected $compiledArgs;
+    
+    function __construct()
+    {
+        
+        $this->compiledArgs =  function($name, $param, $paramPos) {
+            // We have a value
+            if (isset($this->args[$name][$param])) {
+                // Assign the value to the correct position in the constructor
+                $args[$paramPos] = $this->args[$name][$param];
+
+                // If the value is a valid service name, inject that
+                if (isset($this->reflectors[$args[$paramPos]])) {
+                    // Use the $this->get() recursively to ensure that it is also loaded
+                    $args[$paramPos] = $this->get($args[$paramPos]);
+                }
+
+            // No value to use. Is there a default constant?
+            } elseif ($param->isDefaultValueConstant()) {
+                // Set that constant
+                $args[$paramPos] = $param->getDefaultValueConstantName();
+
+            // No value to use. Is there a default value?
+            } elseif ($param->isDefaultValueAvailable()) {
+                // Set that value
+                $args[$paramPos] = $param->getDefaultValue();
+            } else {
+                // No other options... just set it to null
+                $args[$paramPos] = null;
+            }
+            return $args;
+        };
+        
+    }
+    
     /*
      * Registers a class for use in the DIC
      */
@@ -96,30 +131,8 @@ class DIC
                 throw new \Exception("Cannot warm up ".$obj->getName()." (".$obj->getFileName().") because required parameter ".$param->getName()." was not available.");
             }
 
-            // We have a value
-            if (isset($this->args[$name][$param->getName()])) {
-                // Assign the value to the correct position in the constructor
-                $args[$param->getPosition()] = $this->args[$name][$param->getName()];
-
-                // If the value is a valid service name, inject that
-                if (isset($this->reflectors[$args[$param->getPosition()]])) {
-                    // Use the $this->get() recursively to ensure that it is also loaded
-                    $args[$param->getPosition()] = $this->get($args[$param->getPosition()]);
-                }
-
-            // No value to use. Is there a default constant?
-            } elseif ($param->isDefaultValueConstant()) {
-                // Set that constant
-                $args[$param->getPosition()] = $param->getDefaultValueConstantName();
-
-            // No value to use. Is there a default value?
-            } elseif ($param->isDefaultValueAvailable()) {
-                // Set that value
-                $args[$param->getPosition()] = $param->getDefaultValue();
-            } else {
-                // No other options... just set it to null
-                $args[$param->getPosition()] = null;
-            }
+            // Get args from closure
+            $args = $this->compiledArgs($name, $param->getName(), $param->getPosition());
         }
 
         // Make absolutely sure that the args are sorted in the correct position order
@@ -129,7 +142,7 @@ class DIC
         $finalObj = $obj->newInstanceArgs($args);
 
         // Fill the loaded variable for later use with the spiffy new class
-        $this->loaded[$name] &= $finalObj;
+        $this->loaded[$name] = $finalObj;
 
         // unset the args
         unset($this->args[$name]);
